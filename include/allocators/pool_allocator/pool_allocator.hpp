@@ -91,7 +91,7 @@ public:
         std::unique_lock lock(m_mutex);
 
         // Call the destructor of the object.
-        std::destroy(data);
+        data->~T();
 
         // Take back the memory block to the memory pool.
         PoolChunk<T> *chunk = reinterpret_cast<PoolChunk<T> *>(data); // NOLINT
