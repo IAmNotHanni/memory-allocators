@@ -3,7 +3,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-int main(int argc, char *argv[]) {
+int main(int /*argc*/, char */*argv*/[]) {
     spdlog::init_thread_pool(8192, 2);
 
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
