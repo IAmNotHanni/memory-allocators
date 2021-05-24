@@ -2,9 +2,7 @@ name: Build
 on: [push, pull_request]
 
 env:
-  inexor_build_type: "Release"
-  inexor_vulkan_version: "1.2.131.1"
-  inexor_vulkan_sdk: "$GITHUB_WORKSPACE/../vulkan_sdk/"
+  build_type: "Release"
 
 jobs:
   linux:
@@ -13,7 +11,7 @@ jobs:
     container: ubuntu:rolling
     env:
       DEBIAN_FRONTEND: "noninteractive"
-      inexor_conan_path: "$HOME/.local/bin"
+      conan_path: "$HOME/.local/bin"
     strategy:
       fail-fast: false
       matrix:
@@ -69,17 +67,6 @@ jobs:
           pip3 install wheel setuptools
           pip3 install conan mako
 
-      - name: Install Vulkan SDK
-        shell: bash
-        run: |
-          # Download Vulkan SDK
-          curl -LS -o vulkansdk.tar.gz \
-            https://sdk.lunarg.com/sdk/download/${{ env.inexor_vulkan_version }}/linux/vulkansdk-linux-x86_64-${{ env.inexor_vulkan_version }}.tar.gz
-
-          # Create Vulkan SDK directory and extract
-          mkdir "${{ env.inexor_vulkan_sdk }}"
-          tar xfz vulkansdk.tar.gz -C "${{ env.inexor_vulkan_sdk }}"
-
       - name: Checkout
         uses: actions/checkout@v2
 
@@ -88,11 +75,7 @@ jobs:
         run: |
           export CC=${{ matrix.config.cc }}
           export CXX=${{ matrix.config.cxx }}
-          export PATH="${{ env.inexor_conan_path }}":$PATH
-          export VULKAN_SDK="${{ env.inexor_vulkan_sdk }}/${{ env.inexor_vulkan_version }}/x86_64"
-          export PATH=$VULKAN_SDK/bin:$PATH
-          export LD_LIBRARY_PATH=$VULKAN_SDK/lib:$LD_LIBRARY_PATH
-          export VK_LAYER_PATH=$VULKAN_SDK/etc/explicit_layer.d
+          export PATH="${{ env.conan_path }}":$PATH
 
           # Setup conan
           # Note: libstdc++11 is needed to use new libc++ ABI
@@ -102,8 +85,7 @@ jobs:
           # Configure cmake
           cmake . \
             -Bbuild \
-            -DCMAKE_BUILD_TYPE=${{ env.inexor_build_type }} \
-            -DINEXOR_USE_VMA_RECORDING=OFF \
+            -DCMAKE_BUILD_TYPE=${{ env.build_type }} \
             -GNinja \
             ${{ matrix.config.cmake_configure_options }}
 
@@ -111,6 +93,16 @@ jobs:
         shell: bash
         run: |
           cmake --build build
+
+      - name: Run tests
+        shell: bash
+        run: |
+          build/bin/memory-allocators-tests
+
+      - name: Run benchmarks
+        shell: bash
+        run: |
+          build/bin/memory-allocators-benchmarks
 
       - name: Prepare upload
         run: |
@@ -146,14 +138,6 @@ jobs:
           pip3 install conan
           choco install ninja
 
-      - name: Install Vulkan SDK
-        shell: pwsh
-        run: |
-          curl -LS -o vulkansdk.exe `
-            https://sdk.lunarg.com/sdk/download/${{ env.inexor_vulkan_version }}/windows/VulkanSDK-${{ env.inexor_vulkan_version }}-Installer.exe?Human=true
-
-          7z x vulkansdk.exe -o"${{ env.inexor_vulkan_sdk }}"
-
       - name: Checkout
         uses: actions/checkout@v2
 
@@ -162,7 +146,6 @@ jobs:
         run: |
           $env:CC="${{ matrix.config.cc }}"
           $env:CXX="${{ matrix.config.cxx }}"
-          $env:Path += ";${{ env.inexor_vulkan_sdk }}\;${{ env.inexor_vulkan_sdk }}\Bin\"
 
           # Setup conan
           conan profile new default --detect --force
@@ -171,7 +154,7 @@ jobs:
           # Configure CMake
           cmake . `
             -Bbuild `
-            -DCMAKE_BUILD_TYPE=${{ env.inexor_build_type }} `
+            -DCMAKE_BUILD_TYPE=${{ env.build_type }} `
             ${{ matrix.config.cmake_configure_options }}
 
       - name: Build
